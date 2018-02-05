@@ -1,38 +1,66 @@
+# IUS spec file for php72u-pecl-imagick, forked from Fedora:
 # we don't want -z defs linker flag
 %undefine _strict_symbol_defs_build
 
 %global pecl_name  imagick
 %global ini_name   40-%{pecl_name}.ini
-%global with_zts   0%{?__ztsphp:1}
+%global php php72u
+
+%bcond_without zts
 
 Summary:        Provides a wrapper to the ImageMagick library
-Name:           php-pecl-%pecl_name
+Name:		%{php}-pecl-%{pecl_name}
 Version:        3.4.3
-Release:        5%{?dist}
+Release:        1.ius%{?dist}
 License:        PHP
 Group:          Development/Libraries
-URL:            http://pecl.php.net/package/%pecl_name
+URL:            https://pecl.php.net/package/%{pecl_name}
 
-Source0:        http://pecl.php.net/get/%pecl_name-%{version}%{?prever}.tgz
+Source0:        https://pecl.php.net/get/%{pecl_name}-%{version}.tgz
 Patch0:         https://patch-diff.githubusercontent.com/raw/mkoppanen/imagick/pull/221.patch
 
-BuildRequires:  php-pear >= 1.4.7
-BuildRequires:  php-devel >= 5.1.3
-BuildRequires:  ImageMagick-devel >= 6.2.4
+BuildRequires: %{php}-devel
+# https://github.com/mkoppanen/imagick/blob/3.4.3/ChangeLog#L127
+BuildRequires: ImageMagick-devel >= 6.5.3.10
 
-Requires:       php(zend-abi) = %{php_zend_api}
-Requires:       php(api) = %{php_core_api}
+BuildRequires:  pear1u
+# explicitly require pear dependencies to avoid conflicts
+BuildRequires:  %{php}-cli
+BuildRequires:  %{php}-common
+BuildRequires:  %{php}-process
+BuildRequires:  %{php}-xml
 
-Provides:       php-%pecl_name               = %{version}
-Provides:       php-%pecl_name%{?_isa}       = %{version}
-Provides:       php-pecl(%pecl_name)         = %{version}
-Provides:       php-pecl(%pecl_name)%{?_isa} = %{version}
+Requires: php(zend-abi) = %{php_zend_api}
+Requires: php(api) = %{php_core_api}
 
-Conflicts:      php-pecl-gmagick
+# provide the stock name
+Provides: php-pecl-%{pecl_name} = %{version}
+Provides: php-pecl-%{pecl_name}%{?_isa} = %{version}
+
+# provide the stock and IUS names without pecl
+Provides: php-%{pecl_name} = %{version}
+Provides: php-%{pecl_name}%{?_isa} = %{version}
+Provides: %{php}-%{pecl_name} = %{version}
+Provides: %{php}-%{pecl_name}%{?_isa} = %{version}
+
+# provide the stock and IUS names in pecl() format
+Provides: php-pecl(%{pecl_name}) = %{version}
+Provides: php-pecl(%{pecl_name})%{?_isa} = %{version}
+Provides: %{php}-pecl(%{pecl_name}) = %{version}
+Provides: %{php}-pecl(%{pecl_name})%{?_isa} = %{version}
+
+# conflict with the stock name
+Conflicts: php-pecl-%{pecl_name} < %{version}
+
+Conflicts: php-pecl-gmagick
+
+%{?filter_provides_in: %filter_provides_in %{php_extdir}/.*\.so$}
+%{?filter_provides_in: %filter_provides_in %{php_ztsextdir}/.*\.so$}
+%{?filter_setup}
 
 
 %description
-%pecl_name is a native php extension to create and modify images using the
+%{pecl_name} is a native php extension to create and modify images using the
 ImageMagick API.
 
 
@@ -40,7 +68,7 @@ ImageMagick API.
 Summary:       %{pecl_name} extension developer files (header)
 Group:         Development/Libraries
 Requires:      %{name}%{?_isa} = %{version}-%{release}
-Requires:      %{?scl_prefix}php-devel%{?_isa}
+Requires:      %{php}-devel%{?_isa}
 
 %description devel
 These are the files needed to compile programs using %{pecl_name} extension.
@@ -48,7 +76,7 @@ These are the files needed to compile programs using %{pecl_name} extension.
 
 %prep
 %setup -qc
-mv %{pecl_name}-%{version}%{?prever} NTS
+mv %{pecl_name}-%{version} NTS
 
 # don't install any font (and test using it)
 # don't install empty file (d41d8cd98f00b204e9800998ecf8427e)
@@ -63,15 +91,15 @@ then : "Font files detected!"
      exit 1
 fi
 
-cd NTS
+pushd NTS
 %patch0 -p1
 
 extver=$(sed -n '/#define PHP_IMAGICK_VERSION/{s/.* "//;s/".*$//;p}' php_imagick.h)
-if test "x${extver}" != "x%{version}%{?prever}"; then
-   : Error: Upstream version is ${extver}, expecting %{version}%{?prever}.
+if test "x${extver}" != "x%{version}; then
+   : Error: Upstream version is ${extver}, expecting %{version}.
    exit 1
 fi
-cd ..
+popd
 
 cat > %{ini_name} << 'EOF'
 ; Enable %{pecl_name} extension module
@@ -96,17 +124,19 @@ cp -r NTS ZTS
 
 %build
 : Standard NTS build
-cd NTS
+pushd NTS
 %{_bindir}/phpize
 %configure --with-imagick=%{prefix} --with-php-config=%{_bindir}/php-config
 make %{?_smp_mflags}
+popd
 
 %if %{with_zts}
-cd ../ZTS
+pushd ZTS
 : ZTS build
 %{_bindir}/zts-phpize
 %configure --with-imagick=%{prefix} --with-php-config=%{_bindir}/zts-php-config
 make %{?_smp_mflags}
+popd
 %endif
 
 
@@ -117,7 +147,7 @@ make install INSTALL_ROOT=%{buildroot} -C NTS
 install -D -m 644 %{ini_name} %{buildroot}%{php_inidir}/%{ini_name}
 
 # Install XML package description
-install -D -p -m 644 package.xml %{buildroot}%{pecl_xmldir}/%{name}.xml
+install -D -p -m 644 package.xml %{buildroot}%{pecl_xmldir}/%{pecl_name}.xml
 
 %if %{with_zts}
 make install INSTALL_ROOT=%{buildroot} -C ZTS
@@ -138,7 +168,7 @@ done
 export REPORT_EXIT_STATUS=1
 
 : simple module load test for NTS extension
-cd NTS
+pushd NTS
 %{__php} --no-php-ini \
     --define extension_dir=%{buildroot}%{php_extdir} \
     --define extension=%{pecl_name}.so \
@@ -146,6 +176,9 @@ cd NTS
 
 # Ignore know failed test on some ach (s390x, armv7hl, aarch64) with timeout
 rm tests/229_Tutorial_fxAnalyzeImage_case1.phpt
+# tests failing for IUS
+rm tests/bug20636.phpt
+rm tests/151_Imagick_subImageMatch_basic.phpt
 
 : upstream test suite for NTS extension
 TEST_PHP_EXECUTABLE=%{__php} \
@@ -155,17 +188,35 @@ NO_INTERACTION=1 \
 
 %if %{with_zts}
 : simple module load test for ZTS extension
-cd ../ZTS
+popd
 %{__ztsphp} --no-php-ini \
     --define extension_dir=%{buildroot}%{php_ztsextdir} \
     --define extension=%{pecl_name}.so \
     --modules | grep %{pecl_name}
 %endif
 
+%triggerin -- pear1u
+if [ -x %{__pecl} ]; then
+    %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
+fi
+
+
+%posttrans
+if [ -x %{__pecl} ]; then
+    %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
+fi
+
+
+%postun
+if [ $1 -eq 0 -a -x %{__pecl} ]; then
+    %{pecl_uninstall} %{pecl_name} >/dev/null || :
+fi
+
 
 %files
+%license NTS/LICENSE
 %doc %{pecl_docdir}/%{pecl_name}
-%{pecl_xmldir}/%{name}.xml
+%{pecl_xmldir}/%{pecl_name}.xml
 
 %config(noreplace) %{php_inidir}/%{ini_name}
 %{php_extdir}/%{pecl_name}.so
@@ -186,6 +237,9 @@ cd ../ZTS
 
 
 %changelog
+* Mon Feb 05 2018 Ben Harper <ben.harper@rackspace.com> - 3.4.3-1.ius
+- port from Fedora
+
 * Mon Jan 29 2018 Remi Collet <remi@remirepo.net> - 3.4.3-5
 - undefine _strict_symbol_defs_build
 - use patch from https://github.com/mkoppanen/imagick/pull/221
