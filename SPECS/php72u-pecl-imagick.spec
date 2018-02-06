@@ -95,7 +95,7 @@ pushd NTS
 %patch0 -p1
 
 extver=$(sed -n '/#define PHP_IMAGICK_VERSION/{s/.* "//;s/".*$//;p}' php_imagick.h)
-if test "x${extver}" != "x%{version}; then
+if test "x${extver}" != "x%{version}"; then
    : Error: Upstream version is ${extver}, expecting %{version}.
    exit 1
 fi
