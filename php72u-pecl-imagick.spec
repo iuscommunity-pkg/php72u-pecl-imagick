@@ -1,62 +1,47 @@
-# IUS spec file for php72u-pecl-imagick, forked from Fedora:
 # we don't want -z defs linker flag
 %undefine _strict_symbol_defs_build
 
 %global pecl_name  imagick
 %global ini_name   40-%{pecl_name}.ini
-%global php php72u
+%global php        php72u
 
 %bcond_without zts
 
 Summary:        Provides a wrapper to the ImageMagick library
-Name:		%{php}-pecl-%{pecl_name}
+Name:           %{php}-pecl-%{pecl_name}
 Version:        3.4.3
-Release:        1.ius%{?dist}
+Release:        1%{?dist}
 License:        PHP
-Group:          Development/Libraries
 URL:            https://pecl.php.net/package/%{pecl_name}
 
 Source0:        https://pecl.php.net/get/%{pecl_name}-%{version}.tgz
 Patch0:         https://patch-diff.githubusercontent.com/raw/mkoppanen/imagick/pull/221.patch
 
-BuildRequires: %{php}-devel
-# https://github.com/mkoppanen/imagick/blob/3.4.3/ChangeLog#L127
-BuildRequires: ImageMagick-devel >= 6.5.3.10
+BuildRequires:  %{php}-devel
+# build require pear1's dependencies to avoid mismatched php stacks
+BuildRequires:  pear1 %{php}-cli %{php}-common %{php}-xml
+# https://github.com/Imagick/imagick/blob/3.4.2/ChangeLog#L83
+BuildRequires:  ImageMagick-devel >= 6.5.3.10
 
-BuildRequires:  pear1u
-# explicitly require pear dependencies to avoid conflicts
-BuildRequires:  %{php}-cli
-BuildRequires:  %{php}-common
-BuildRequires:  %{php}-process
-BuildRequires:  %{php}-xml
+Requires:       php(zend-abi) = %{php_zend_api}
+Requires:       php(api) = %{php_core_api}
 
-Requires: php(zend-abi) = %{php_zend_api}
-Requires: php(api) = %{php_core_api}
+Provides:       php-%{pecl_name} = %{version}
+Provides:       php-%{pecl_name}%{?_isa} = %{version}
+Provides:       php-pecl(%{pecl_name}) = %{version}
+Provides:       php-pecl(%{pecl_name})%{?_isa} = %{version}
 
-# provide the stock name
-Provides: php-pecl-%{pecl_name} = %{version}
-Provides: php-pecl-%{pecl_name}%{?_isa} = %{version}
+Provides:       %{php}-%{pecl_name} = %{version}
+Provides:       %{php}-%{pecl_name}%{?_isa} = %{version}
+Provides:       %{php}-pecl(%{pecl_name}) = %{version}
+Provides:       %{php}-pecl(%{pecl_name})%{?_isa} = %{version}
 
-# provide the stock and IUS names without pecl
-Provides: php-%{pecl_name} = %{version}
-Provides: php-%{pecl_name}%{?_isa} = %{version}
-Provides: %{php}-%{pecl_name} = %{version}
-Provides: %{php}-%{pecl_name}%{?_isa} = %{version}
+Conflicts:      php-pecl-gmagick
 
-# provide the stock and IUS names in pecl() format
-Provides: php-pecl(%{pecl_name}) = %{version}
-Provides: php-pecl(%{pecl_name})%{?_isa} = %{version}
-Provides: %{php}-pecl(%{pecl_name}) = %{version}
-Provides: %{php}-pecl(%{pecl_name})%{?_isa} = %{version}
-
-# conflict with the stock name
-Conflicts: php-pecl-%{pecl_name} < %{version}
-
-Conflicts: php-pecl-gmagick
-
-%{?filter_provides_in: %filter_provides_in %{php_extdir}/.*\.so$}
-%{?filter_provides_in: %filter_provides_in %{php_ztsextdir}/.*\.so$}
-%{?filter_setup}
+# safe replacement
+Provides:       php-pecl-%{pecl_name} = %{version}-%{release}
+Provides:       php-pecl-%{pecl_name}%{?_isa} = %{version}-%{release}
+Conflicts:      php-pecl-%{pecl_name} < %{version}-%{release}
 
 
 %description
@@ -66,7 +51,6 @@ ImageMagick API.
 
 %package devel
 Summary:       %{pecl_name} extension developer files (header)
-Group:         Development/Libraries
 Requires:      %{name}%{?_isa} = %{version}-%{release}
 Requires:      %{php}-devel%{?_isa}
 
@@ -127,7 +111,7 @@ cp -r NTS ZTS
 pushd NTS
 %{_bindir}/phpize
 %configure --with-imagick=%{prefix} --with-php-config=%{_bindir}/php-config
-make %{?_smp_mflags}
+%make_build
 popd
 
 %if %{with_zts}
@@ -135,7 +119,7 @@ pushd ZTS
 : ZTS build
 %{_bindir}/zts-phpize
 %configure --with-imagick=%{prefix} --with-php-config=%{_bindir}/zts-php-config
-make %{?_smp_mflags}
+%make_build
 popd
 %endif
 
@@ -185,17 +169,20 @@ TEST_PHP_EXECUTABLE=%{__php} \
 TEST_PHP_ARGS="-n -d extension=%{buildroot}%{php_extdir}/%{pecl_name}.so" \
 NO_INTERACTION=1 \
 %{__php} -n run-tests.php --show-diff
+popd
 
 %if %{with_zts}
 : simple module load test for ZTS extension
-popd
+pushd ZTS
 %{__ztsphp} --no-php-ini \
     --define extension_dir=%{buildroot}%{php_ztsextdir} \
     --define extension=%{pecl_name}.so \
     --modules | grep %{pecl_name}
+popd
 %endif
 
-%triggerin -- pear1u
+
+%triggerin -- pear1
 if [ -x %{__pecl} ]; then
     %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
 fi
@@ -365,8 +352,8 @@ fi
 - All modifications in this release inspired by Fedora review by Remi Collet.
 - Add versions to BR for php-devel and ImageMagick-devel
 - Remove -n option from %%setup which was excessive with -c
-- Module install/uninstall actions surround with %%if 0%{?pecl_(un)?install:1} ... %%endif
-- Add Provides: php-pecl(%peclName) = %{version}
+- Module install/uninstall actions surround with %%if 0%%{?pecl_(un)?install:1} ... %%endif
+- Add Provides: php-pecl(%%peclName) = %%{version}
 
 * Sat Jan 3 2009 Pavel Alexeev <Pahan [ at ] Hubbitus [ DOT ] spb [ dOt.] su> - 2.2.1-2
 - License changed to PHP (thanks to Remi Collet)
