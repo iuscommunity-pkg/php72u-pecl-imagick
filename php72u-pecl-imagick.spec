@@ -9,13 +9,12 @@
 
 Summary:        Provides a wrapper to the ImageMagick library
 Name:           %{php}-pecl-%{pecl_name}
-Version:        3.4.3
+Version:        3.4.4
 Release:        1%{?dist}
 License:        PHP
 URL:            https://pecl.php.net/package/%{pecl_name}
 
 Source0:        https://pecl.php.net/get/%{pecl_name}-%{version}.tgz
-Patch0:         https://patch-diff.githubusercontent.com/raw/mkoppanen/imagick/pull/221.patch
 
 BuildRequires:  %{php}-devel
 # build require pear1's dependencies to avoid mismatched php stacks
@@ -76,8 +75,6 @@ then : "Font files detected!"
 fi
 
 pushd NTS
-%patch0 -p1
-
 extver=$(sed -n '/#define PHP_IMAGICK_VERSION/{s/.* "//;s/".*$//;p}' php_imagick.h)
 if test "x${extver}" != "x%{version}"; then
    : Error: Upstream version is ${extver}, expecting %{version}.
@@ -224,6 +221,9 @@ fi
 
 
 %changelog
+* Fri Apr 10 2020 Carl George <carl@george.computer> - 3.4.4-1
+- Latest upstream
+
 * Mon Feb 05 2018 Ben Harper <ben.harper@rackspace.com> - 3.4.3-1.ius
 - port from Fedora
 
